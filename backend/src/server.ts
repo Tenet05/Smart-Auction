@@ -1,7 +1,6 @@
 import http from "http";
 import path from "path";
 import dotenv from "dotenv";
-import axios from "axios";
 dotenv.config();
 
 import { v2 as cloudinary } from "cloudinary";
@@ -21,19 +20,9 @@ initWebSocketServer(server);
 
 const PORT = Number(process.env.PORT) || 5000;
 
-async function logRenderIP() {
-  try {
-    const { data } = await axios.get("https://api.ipify.org?format=json");
-    console.log("🌐 Render Public IP:", data.ip);
-  } catch (error) {
-    console.error("❌ Failed to fetch public IP:", error);
-  }
-}
-
 server.listen(PORT, async () => {
   console.log(`\n🚀 SmartAuction Backend running on port ${PORT}`);
   console.log(`   Env: ${process.env.NODE_ENV || "development"}`);
-  await logRenderIP();
   await connection();
   startCronJobs();
   console.log("✅ All systems ready\n");

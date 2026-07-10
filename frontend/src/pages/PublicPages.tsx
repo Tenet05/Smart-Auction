@@ -10,6 +10,7 @@ import { submitQuestion, submitAnswer } from "../store/slices";
 import { fetchMySiteRating, submitSiteRating, clearSiteRatingError, clearSiteRatingMessage } from "../store/slices";
 import { useCountdown, fmtCountdown, useAuctionSocket } from "../hooks/index";
 import { Spinner, EmptyState, PageLoader } from "../components/ui/index";
+import GoogleButton from "../components/auth/GoogleButton";
 import heroBg from "../assets/hero-bg.png";
 
 // ═══════════════════════════════════════════════════════════════════
@@ -262,9 +263,21 @@ export const Home: React.FC = () => {
               </div>
             </div>
 
-            {/* Hero auction carousel: 1 big + 2 small cards, capped at 2 pages of 3 */}
+            {/* Hero auction carousel: 1 big + up to 2 small cards, capped at 2 pages of 3.
+                Adapts to however many auctions actually exist — with only 1 or 2
+                auctions in the platform, it still shows those instead of showing
+                nothing (it used to require exactly 3 to render at all). */}
             <div className="hidden lg:block">
-              {currentHero.length === 3 && (
+              {currentHero.length === 1 && (
+                <div style={{ minHeight: "22rem" }}><HeroCard auction={currentHero[0]} big/></div>
+              )}
+              {currentHero.length === 2 && (
+                <div className="grid grid-cols-2 gap-4" style={{ minHeight: "22rem" }}>
+                  <HeroCard auction={currentHero[0]} big/>
+                  <HeroCard auction={currentHero[1]} big/>
+                </div>
+              )}
+              {currentHero.length >= 3 && (
                 <div className="grid grid-cols-2 grid-rows-2 gap-4" style={{ minHeight: "22rem" }}>
                   <div className="row-span-2"><HeroCard auction={currentHero[0]} big/></div>
                   <HeroCard auction={currentHero[1]}/>
@@ -474,6 +487,14 @@ export const Login: React.FC = () => {
             {loading ? <><Spinner size="h-4 w-4"/><span>Signing in...</span></> : "Sign In"}
           </button>
         </form>
+
+        <div className="flex items-center gap-3 py-4">
+          <div className="flex-1 h-px bg-gray-200"/>
+          <span className="text-xs text-gray-400">Or continue with</span>
+          <div className="flex-1 h-px bg-gray-200"/>
+        </div>
+        <GoogleButton/>
+
         <p className="text-center text-sm text-gray-500 mt-5">Don't have an account? <Link to="/register" className="text-indigo-600 font-medium hover:underline">Sign up</Link></p>
         <p className="text-center text-xs text-gray-400 mt-2">Need to verify your email? <Link to="/verify-email" className="text-indigo-600 hover:underline">Verify now</Link></p>
       </div>
@@ -486,15 +507,32 @@ export const Login: React.FC = () => {
 // ═══════════════════════════════════════════════════════════════════
 export const Register: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { loading, error, message } = useAppSelector(s => s.auth);
+  const navigate = useNavigate();
+  const { loading, error, message, isAuthenticated } = useAppSelector(s => s.auth);
   const [step, setStep] = useState<"form"|"otp">("form");
   const [savedEmail, setSavedEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [preview, setPreview] = useState<string|null>(null);
   const [form, setForm] = useState({ userName:"", email:"", password:"", phone:"", address:"", role:"Bidder", profileImage: null as File|null });
 
+  // Google sign-up logs the person in immediately (no OTP step needed).
+  useEffect(() => { if (isAuthenticated) navigate("/"); }, [isAuthenticated]);
   useEffect(() => { if (error) { toast.error(error); dispatch(clearError()); } }, [error]);
-  useEffect(() => { if (message && step === "form") { toast.success(message); dispatch(clearMessage()); setSavedEmail(form.email); setStep("otp"); } }, [message, step]);
+  useEffect(() => {
+    if (message) {
+      toast.success(message);
+      dispatch(clearMessage());
+      // Only the plain email/OTP flow needs to advance to the OTP step —
+      // a successful Google sign-up/login lands here already authenticated.
+      if (step === "form" && !isAuthenticated) { setSavedEmail(form.email); setStep("otp"); }
+      // Google sign-up skips the profile form entirely, so phone/address/
+      // profile photo are still empty on the new account — nudge the person
+      // to fill them in.
+      if (message.includes("Account created with Google")) {
+        setTimeout(() => toast("Add a profile photo, phone number, and address to complete your profile.", { icon: "📝", duration: 6000 }), 400);
+      }
+    }
+  }, [message]);
 
   const handleImg = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (f) { setForm({...form, profileImage:f}); setPreview(URL.createObjectURL(f)); }
@@ -537,6 +575,29 @@ export const Register: React.FC = () => {
           <div className="flex items-center justify-center gap-2 text-indigo-600 font-bold text-xl mb-2"><Gavel size={22}/> SmartAuction</div>
           <h2 className="text-2xl font-bold text-gray-900">Create account</h2>
         </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">I want to</label>
+            <div className="grid grid-cols-2 gap-3">
+              {["Bidder","Auctioneer"].map(r=>(
+                <button key={r} type="button" onClick={()=>setForm({...form,role:r})}
+                  className={`py-2.5 rounded-lg text-sm font-medium border transition-colors ${form.role===r?"bg-indigo-600 text-white border-indigo-600":"border-gray-300 text-gray-600 hover:border-indigo-300"}`}>
+                  {r==="Bidder"?"🛒 Buy & Bid":"🏷️ Sell & Auction"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <GoogleButton role={form.role as "Bidder"|"Auctioneer"}/>
+
+          <div className="flex items-center gap-3 py-1">
+            <div className="flex-1 h-px bg-gray-200"/>
+            <span className="text-xs text-gray-400">Or sign up with email</span>
+            <div className="flex-1 h-px bg-gray-200"/>
+          </div>
+        </div>
+
         <form onSubmit={handleRegister} className="space-y-4">
           <div className="flex justify-center">
             <label className="cursor-pointer">
@@ -569,17 +630,6 @@ export const Register: React.FC = () => {
             <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
             <input value={form.address} onChange={e=>setForm({...form,address:e.target.value})} required placeholder="Your address"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"/>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">I want to</label>
-            <div className="grid grid-cols-2 gap-3">
-              {["Bidder","Auctioneer"].map(r=>(
-                <button key={r} type="button" onClick={()=>setForm({...form,role:r})}
-                  className={`py-2.5 rounded-lg text-sm font-medium border transition-colors ${form.role===r?"bg-indigo-600 text-white border-indigo-600":"border-gray-300 text-gray-600 hover:border-indigo-300"}`}>
-                  {r==="Bidder"?"🛒 Buy & Bid":"🏷️ Sell & Auction"}
-                </button>
-              ))}
-            </div>
           </div>
           <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition-colors disabled:opacity-60">
             {loading ? "Creating Account..." : "Create Account"}
