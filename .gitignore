@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.tsbuildinfo
+backend/src/config/config.env
+frontend/.env
+.env
+ml/model/*.pkl
+*.log
+.DS_Store
+Thumbs.db
+/tmp/
