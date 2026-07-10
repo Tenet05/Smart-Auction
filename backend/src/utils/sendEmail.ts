@@ -58,7 +58,19 @@ export const sendEmail = async ({ email, subject, message, html }: SendEmailPara
     await api.sendTransacEmail(emailData);
     console.log(`✅ Email → ${email}: ${subject}`);
   } catch (err: any) {
-    console.error(`❌ Email failed → ${email}:`, err?.response?.body || err.message);
+    console.log("========== BREVO EMAIL ERROR ==========");
+
+    console.log("Status:", err?.status || err?.response?.statusCode);
+
+    console.log("Response Body:", err?.response?.body);
+
+    console.log("Response Text:", err?.response?.text);
+
+    console.log("Body:", err?.body);
+
+    console.log("Error:", err);
+
+    console.log("=======================================");
   }
 };
 
